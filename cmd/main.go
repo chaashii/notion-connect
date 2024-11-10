@@ -4,10 +4,13 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"notion-connect/internal/config"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"notion-connect/middleware"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -15,6 +18,26 @@ import (
 )
 
 func main() {
+	// Load configuration
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
+	}
+
+	// Use configuration values
+	// serverAddr := cfg.Server.Host + ":" + cfg.Server.Port
+
+	// // Initialize database connection
+	// db, err := initDB(cfg.Database.GetDSN())
+	// if err != nil {
+	//     log.Fatalf("Failed to connect to database: %v", err)
+	// }
+
+	// // Initialize Redis if needed
+	// redis, err := initRedis(cfg.Redis)
+	// if err != nil {
+	//     log.Fatalf("Failed to connect to Redis: %v", err)
+	// }
 
 	// Load .env file
 	if err := godotenv.Load(); err != nil {
@@ -22,9 +45,11 @@ func main() {
 	}
 
 	// Set Gin mode
-	gin.SetMode(GetEnv("GIN_MODE"))
+	// gin.SetMode(GetEnv("GIN_MODE"))
+	if cfg.IsDevelopment() {
+		gin.SetMode("debug")
+	}
 	router := gin.Default()
-
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:5173"},
 		AllowMethods:     []string{"PUT", "PATCH"},
@@ -44,21 +69,19 @@ func main() {
 		})
 	})
 
-	router.GET("/notion/database", ConnectNotion)
-
-	// Get port from environment variable
-	port := GetEnv("PORT")
-
+	notion := middleware.NotionConnectInit(cfg.NotionAPI)
+	router.GET("/notion/database", notion.ConnectNotion)
 	srv := &http.Server{
-		Addr:    ":" + port,
+		Addr:    ":" + cfg.Server.Port,
 		Handler: router,
 	}
 
-	StartServer(srv)
+	// Start server
+	startServer(srv)
 
 }
 
-func StartServer(srv *http.Server) {
+func startServer(srv *http.Server) {
 	// Graceful shutdown
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("listen: %s\n", err)
