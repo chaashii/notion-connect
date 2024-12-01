@@ -136,11 +136,19 @@ func validateConfig(config *Config) error {
 	// 		return fmt.Errorf("JWT secret is required")
 	// 	}
 
-	if config.NotionAPI.DbId == "" || config.NotionAPI.Key == "" {
-		return fmt.Errorf("API key is required")
+	isValid, err := validateNotionConfig(config)
+	if !isValid {
+		return err
 	}
 
 	return nil
+}
+
+func validateNotionConfig(config *Config) (bool, error) {
+	if config.NotionAPI.DbId == "" || config.NotionAPI.Key == "" {
+		return false, fmt.Errorf("API key is required")
+	}
+	return true, nil
 }
 
 // GetDSN returns the database connection string
